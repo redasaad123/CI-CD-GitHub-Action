@@ -37,7 +37,7 @@ jobs:
       - name: Wait for SSH
         timeout-minutes: 5
         run: |
-          MAX_RETRIES=60
+          MAX_RETRIES=5
           RETRY_COUNT=0
           until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -q root@${{ secrets.IP_MASTER }} exit; do
             echo "Waiting for SSH to be available..."
