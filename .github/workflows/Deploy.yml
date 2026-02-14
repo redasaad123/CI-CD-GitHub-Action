@@ -24,7 +24,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.ref }}
+          repository: redasaad123/CI-CD-GitHub-Action  # اسم الريبو اللي فيه docker-compose.yml
+          ref: main
 
       - name: Install SSH Password Tool
         run: |
