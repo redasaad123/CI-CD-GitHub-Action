@@ -6,6 +6,11 @@ on:
         description: 'Name of the application'
         required: true
         type: string
+    secrets: # لازم تعرفهم هنا عشان الـ Workflow يشوفهم
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
 
 jobs:
   build: 
