@@ -1,0 +1,57 @@
+name: Deploy Application
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: 'Name of the application'
+        required: true
+        type: string
+      
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        run: |
+          if [ -z "${{ secrets.IP_MASTER }}" ]; then
+            echo "Missing IP_MASTER secret"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          touch ~/.ssh/known_hosts
+          echo "${{ secrets.PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -T 5 -H ${{ secrets.IP_MASTER }} >> ~/.ssh/known_hosts || true
+
+      - name: Wait for SSH
+        timeout-minutes: 5
+        run: |
+          MAX_RETRIES=60
+          RETRY_COUNT=0
+          until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -q root@${{ secrets.IP_MASTER }} exit; do
+            echo "Waiting for SSH to be available..."
+            sleep 5
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+              echo "❌ SSH connection timeout after $((MAX_RETRIES * 5)) seconds"
+              exit 1
+            fi
+          done
+          echo "✅ SSH connection established"
+
+      - name: Move the file to Master Server
+        run: |
+          scp -i ~/.ssh/id_rsa Docker-Compose.yml root@${{ secrets.IP_MASTER }}:/home/root/docker-compose.yml
+
+        
+
+      
+        
+
+  
+        
