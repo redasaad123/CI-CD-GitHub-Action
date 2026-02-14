@@ -149,6 +149,11 @@ jobs:
           
           echo "🚀 File deployment completed successfully!"
 
+      - name: Down Container if Running
+        run: |
+          echo "🔍 Checking for existing Docker containers..."
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "cd $TARGET_DIR && if [ -f docker-compose.yml ]; then docker compose down; else echo '⚠️ No docker-compose.yml found to bring down'; fi"
+
       - name: Run Docker Compose on Server
         run: |
           echo "🚀 Starting application using Docker Compose on remote server..."
