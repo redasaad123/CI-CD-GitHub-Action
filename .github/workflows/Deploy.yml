@@ -153,7 +153,7 @@ jobs:
         run: |
           echo "🚀 Starting application using Docker Compose on remote server..."
 
-          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "cd $TARGET_DIR && docker-compose up -d"  
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "cd $TARGET_DIR && docker compose up -d"  
           
 
 
