@@ -25,34 +25,92 @@ jobs:
       - name: Setup SSH Key
         run: |
           if [ -z "${{ secrets.IP_MASTER }}" ]; then
-            echo "Missing IP_MASTER secret"
+            echo "❌ Missing IP_MASTER secret"
             exit 1
           fi
+          if [ -z "${{ secrets.PRIVATE_KEY }}" ]; then
+            echo "❌ Missing PRIVATE_KEY secret"
+            exit 1
+          fi
+          echo "🔧 Setting up SSH configuration..."
+          echo "📍 Target server: ${{ secrets.IP_MASTER }}"
           mkdir -p ~/.ssh
           touch ~/.ssh/known_hosts
           echo "${{ secrets.PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -T 5 -H ${{ secrets.IP_MASTER }} >> ~/.ssh/known_hosts || true
+          echo "🔍 Scanning host keys..."
+          ssh-keyscan -T 10 -H ${{ secrets.IP_MASTER }} >> ~/.ssh/known_hosts || echo "⚠️ Host key scan failed, will use StrictHostKeyChecking=no"
 
-      - name: Wait for SSH
-        timeout-minutes: 3
+      - name: Check Server Connectivity
+        timeout-minutes: 2
         run: |
-          MAX_RETRIES=5
+          echo "🌐 Testing basic connectivity to ${{ secrets.IP_MASTER }}..."
+          # Test if server responds to ping
+          if ping -c 3 ${{ secrets.IP_MASTER }} > /dev/null 2>&1; then
+            echo "✅ Server is reachable via ping"
+          else
+            echo "❌ Server is not responding to ping"
+            echo "💡 This might be normal if ICMP is disabled"
+          fi
+          
+          # Test if SSH port is open
+          echo "🔍 Testing SSH port (22) connectivity..."
+          if timeout 10 bash -c "</dev/tcp/${{ secrets.IP_MASTER }}/22"; then
+            echo "✅ SSH port 22 is open"
+          else
+            echo "❌ SSH port 22 is not accessible"
+            echo "💡 Please ensure:"
+            echo "   - SSH service is running on the server"
+            echo "   - Port 22 is open in firewall"
+            echo "   - Server IP address is correct"
+            exit 1
+          fi
+
+      - name: Test SSH Connection
+        timeout-minutes: 1
+        run: |
+          echo "🔐 Testing SSH authentication..."
+          MAX_RETRIES=3
           RETRY_COUNT=0
-          until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -q root@${{ secrets.IP_MASTER }} exit; do
-            echo "Waiting for SSH to be available..."
-            sleep 5
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-              echo "❌ SSH connection timeout after $((MAX_RETRIES * 5)) seconds"
-              exit 1
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "📡 Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Connecting to root@${{ secrets.IP_MASTER }}..."
+            
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes root@${{ secrets.IP_MASTER }} 'echo "✅ SSH connection successful!" && whoami && pwd'; then
+              echo "🎉 SSH authentication successful!"
+              break
+            else
+              echo "❌ SSH connection failed"
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⏳ Waiting 10 seconds before retry..."
+                sleep 10
+              fi
             fi
           done
-          echo "✅ SSH connection established"
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "💥 Failed to establish SSH connection after $MAX_RETRIES attempts"
+            echo "🔍 Troubleshooting tips:"
+            echo "   1. Verify the private key is correct"
+            echo "   2. Check if the key matches the public key on the server"
+            echo "   3. Ensure root login is allowed (PermitRootLogin yes)"
+            echo "   4. Check server SSH logs: sudo journalctl -u ssh"
+            exit 1
+          fi
 
-      - name: Move the file to Master Server
+      - name: Deploy Docker Compose File
         run: |
-          scp -i ~/.ssh/id_rsa Docker-Compose.yml root@${{ secrets.IP_MASTER }}:/home/root/docker-compose.yml
+          echo "📁 Copying Docker Compose file to server..."
+          if scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no Docker-Compose.yml root@${{ secrets.IP_MASTER }}:/home/root/docker-compose.yml; then
+            echo "✅ Docker Compose file copied successfully"
+          else
+            echo "❌ Failed to copy Docker Compose file"
+            exit 1
+          fi
+          
+          echo "🔍 Verifying file on remote server..."
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.IP_MASTER }} 'ls -la /home/root/docker-compose.yml && echo "📋 File verification complete"'
 
         
 
