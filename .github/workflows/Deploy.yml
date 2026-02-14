@@ -6,6 +6,12 @@ on:
         description: 'Name of the application'
         required: true
         type: string
+
+    secrets: # لازم تعرفهم هنا عشان الـ Workflow يشوفهم
+      IP_MASTER:
+        required: true
+      PRIVATE_KEY:
+        required: true
       
 jobs:
   deploy:
