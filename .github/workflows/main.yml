@@ -23,4 +23,5 @@ jobs:
       app_name: "your-app-name"  # Replace with your actual app name
     secrets:
       IP_MASTER: ${{ secrets.IP_MASTER }}
-      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+      SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+      SSH_USER: ${{ secrets.SSH_USER }}  # Optional: defaults to 'root' if not provided

@@ -10,8 +10,10 @@ on:
     secrets: # لازم تعرفهم هنا عشان الـ Workflow يشوفهم
       IP_MASTER:
         required: true
-      PRIVATE_KEY:
+      SSH_PASSWORD:
         required: true
+      SSH_USER:
+        required: false
       
 jobs:
   deploy:
@@ -22,22 +24,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup SSH Key
+      - name: Install SSH Password Tool
+        run: |
+          echo "🔧 Installing sshpass for password authentication..."
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          echo "✅ sshpass installed successfully"
+
+      - name: Setup SSH Configuration
         run: |
           if [ -z "${{ secrets.IP_MASTER }}" ]; then
             echo "❌ Missing IP_MASTER secret"
             exit 1
           fi
-          if [ -z "${{ secrets.PRIVATE_KEY }}" ]; then
-            echo "❌ Missing PRIVATE_KEY secret"
+          if [ -z "${{ secrets.SSH_PASSWORD }}" ]; then
+            echo "❌ Missing SSH_PASSWORD secret"
             exit 1
           fi
+          
+          # Set default user to root if SSH_USER not provided
+          SSH_USER="${{ secrets.SSH_USER }}"
+          if [ -z "$SSH_USER" ]; then
+            SSH_USER="root"
+          fi
+          echo "SSH_USER=$SSH_USER" >> $GITHUB_ENV
+          
           echo "🔧 Setting up SSH configuration..."
           echo "📍 Target server: ${{ secrets.IP_MASTER }}"
+          echo "👤 SSH User: $SSH_USER"
+          echo "🔐 Using password authentication"
+          
           mkdir -p ~/.ssh
           touch ~/.ssh/known_hosts
-          echo "${{ secrets.PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           echo "🔍 Scanning host keys..."
           ssh-keyscan -T 10 -H ${{ secrets.IP_MASTER }} >> ~/.ssh/known_hosts || echo "⚠️ Host key scan failed, will use StrictHostKeyChecking=no"
 
@@ -67,17 +85,17 @@ jobs:
           fi
 
       - name: Test SSH Connection
-        timeout-minutes: 1
+        timeout-minutes: 2
         run: |
-          echo "🔐 Testing SSH authentication..."
+          echo "🔐 Testing SSH password authentication..."
           MAX_RETRIES=3
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            echo "📡 Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Connecting to root@${{ secrets.IP_MASTER }}..."
+            echo "📡 Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Connecting to $SSH_USER@${{ secrets.IP_MASTER }}..."
             
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes root@${{ secrets.IP_MASTER }} 'echo "✅ SSH connection successful!" && whoami && pwd'; then
-              echo "🎉 SSH authentication successful!"
+            if sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 $SSH_USER@${{ secrets.IP_MASTER }} 'echo "✅ SSH connection successful!" && whoami && pwd'; then
+              echo "🎉 SSH password authentication successful!"
               break
             else
               echo "❌ SSH connection failed"
@@ -91,26 +109,42 @@ jobs:
           
           if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
             echo "💥 Failed to establish SSH connection after $MAX_RETRIES attempts"
-            echo "🔍 Troubleshooting tips:"
-            echo "   1. Verify the private key is correct"
-            echo "   2. Check if the key matches the public key on the server"
-            echo "   3. Ensure root login is allowed (PermitRootLogin yes)"
-            echo "   4. Check server SSH logs: sudo journalctl -u ssh"
+            echo "🔍 Troubleshooting for password authentication:"
+            echo "   1. ✅ Verify the password is correct"
+            echo "   2. ✅ Check if password authentication is enabled on server:"
+            echo "      - Edit: sudo nano /etc/ssh/sshd_config"
+            echo "      - Set: PasswordAuthentication yes"
+            echo "      - Set: PermitRootLogin yes (if using root)"
+            echo "      - Restart: sudo systemctl restart ssh"
+            echo "   3. ✅ Ensure user exists on server: cat /etc/passwd | grep $SSH_USER"
+            echo "   4. ✅ Check server SSH logs: sudo tail -f /var/log/auth.log"
             exit 1
           fi
 
       - name: Deploy Docker Compose File
         run: |
-          echo "📁 Copying Docker Compose file to server..."
-          if scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no Docker-Compose.yml root@${{ secrets.IP_MASTER }}:/home/root/docker-compose.yml; then
-            echo "✅ Docker Compose file copied successfully"
+          echo "📁 Copying Docker Compose file to server using password authentication..."
+          
+          # Determine target directory based on user
+          if [ "$SSH_USER" = "root" ]; then
+            TARGET_DIR="/root"
+          else
+            TARGET_DIR="/home/$SSH_USER"
+          fi
+          
+          echo "📍 Target directory: $TARGET_DIR"
+          
+          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no Docker-Compose.yml $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/docker-compose.yml; then
+            echo "✅ Docker Compose file copied successfully to $TARGET_DIR"
           else
             echo "❌ Failed to copy Docker Compose file"
             exit 1
           fi
           
           echo "🔍 Verifying file on remote server..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no root@${{ secrets.IP_MASTER }} 'ls -la /home/root/docker-compose.yml && echo "📋 File verification complete"'
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "ls -la $TARGET_DIR/docker-compose.yml && echo '📋 File verification complete'"
+          
+          echo "🚀 File deployment completed successfully!"
 
         
 
