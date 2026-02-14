@@ -25,9 +25,7 @@ jobs:
 
       - name: Checkout DevOps Repo (Docker Compose)
         uses: actions/checkout@v3
-        with:
-          repository: redasaad123/CI-CD-GitHub-Action
-          path: .
+        
 
       - name: Install SSH Password Tool
         run: |
