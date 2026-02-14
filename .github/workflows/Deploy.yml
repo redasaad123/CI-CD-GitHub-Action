@@ -137,7 +137,7 @@ jobs:
           
           echo "📍 Target directory: $TARGET_DIR"
           
-          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no docker-compose.yml $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/docker-compose.yml; then
+          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no Backend/docker-compose.yml $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/docker-compose.yml; then
             echo "✅ Docker Compose file copied successfully to $TARGET_DIR"
           else
             echo "❌ Failed to copy Docker Compose file"
