@@ -124,6 +124,33 @@ jobs:
             exit 1
           fi
 
+      - name: move the config file to the server
+        run: |
+          echo "📁 Moving configuration file to server using password authentication..."
+          
+          # Determine target directory based on user
+          if [ "$SSH_USER" = "root" ]; then
+            TARGET_DIR="/root"
+          else
+            TARGET_DIR="/home/$SSH_USER"
+          fi
+          
+          echo "📍 Target directory: $TARGET_DIR"
+          
+          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no backend/nginx/nginx.conf $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/nginx/nginx.conf; then
+            echo "✅ Configuration file copied successfully to $TARGET_DIR"
+          else
+            echo "❌ Failed to copy configuration file"
+            exit 1
+          fi
+          
+          echo "🔍 Verifying file on remote server..."
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "ls -la $TARGET_DIR/nginx/nginx.conf && echo '📋 File verification complete'"
+          
+          echo "🚀 Configuration file deployment completed successfully!"
+
+          
+
       - name: Deploy Docker Compose File
         run: |
           echo "📁 Copying Docker Compose file to server using password authentication..."
