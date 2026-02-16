@@ -6,7 +6,7 @@ on:
         description: 'Name of the application'
         required: true
         type: string
-    working-directory: 
+      working-directory: 
         description: 'Name of the workflow to trigger after build'
         required: false
         type: string
