@@ -6,11 +6,17 @@ on:
         description: 'Name of the application'
         required: true
         type: string
+      working-directory: 
+        description: 'Name of the workflow to trigger after build'
+        required: false
+        type: string
     secrets: # لازم تعرفهم هنا عشان الـ Workflow يشوفهم
       DOCKER_USERNAME:
         required: true
       DOCKER_PASSWORD:
         required: true
+
+      
 
 jobs:
   build: 
@@ -18,7 +24,7 @@ jobs:
     # هنا بنقول للجوكر إن كل الأوامر اللي جاية هتتنفذ جوه فولدر الـ backend
     defaults:
       run:
-        working-directory: ./backend 
+        working-directory: ${{ inputs.working-directory }}
 
     steps:
       - name: Checkout code

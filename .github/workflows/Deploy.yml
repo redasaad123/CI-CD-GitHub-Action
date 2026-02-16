@@ -6,6 +6,10 @@ on:
         description: 'Name of the application'
         required: true
         type: string
+    working-directory: 
+        description: 'Name of the workflow to trigger after build'
+        required: false
+        type: string
 
     secrets: # لازم تعرفهم هنا عشان الـ Workflow يشوفهم
       IP_MASTER:
@@ -126,55 +130,29 @@ jobs:
 
       - name: move the config file to the server
         run: |
-          echo "📁 Moving configuration file to server using password authentication..."
           
-          # Determine target directory based on user
-          if [ "$SSH_USER" = "root" ]; then
-            TARGET_DIR="/root"
-          else
-            TARGET_DIR="/home/$SSH_USER"
-          fi
+          TARGET_DIR="/root"
           
-          echo "📍 Target directory: $TARGET_DIR"
-          
-          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no backend/nginx/nginx.conf $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/nginx/nginx.conf; then
+          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no ${{ inputs.working-directory }}/nginx/nginx.conf $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/nginx/nginx.conf; then
             echo "✅ Configuration file copied successfully to $TARGET_DIR"
           else
             echo "❌ Failed to copy configuration file"
             exit 1
           fi
-          
-          echo "🔍 Verifying file on remote server..."
-          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "ls -la $TARGET_DIR/nginx/nginx.conf && echo '📋 File verification complete'"
-          
-          echo "🚀 Configuration file deployment completed successfully!"
-
-          
 
       - name: Deploy Docker Compose File
         run: |
-          echo "📁 Copying Docker Compose file to server using password authentication..."
           
-          # Determine target directory based on user
-          if [ "$SSH_USER" = "root" ]; then
-            TARGET_DIR="/root"
-          else
-            TARGET_DIR="/home/$SSH_USER"
-          fi
+
+          TARGET_DIR="/root"
           
-          echo "📍 Target directory: $TARGET_DIR"
-          
-          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no backend/docker-compose.yml $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/docker-compose.yml; then
+          if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no ${{ inputs.working-directory }}/docker-compose.yml $SSH_USER@${{ secrets.IP_MASTER }}:$TARGET_DIR/docker-compose.yml; then
             echo "✅ Docker Compose file copied successfully to $TARGET_DIR"
           else
             echo "❌ Failed to copy Docker Compose file"
             exit 1
           fi
           
-          echo "🔍 Verifying file on remote server..."
-          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "ls -la $TARGET_DIR/docker-compose.yml && echo '📋 File verification complete'"
-          
-          echo "🚀 File deployment completed successfully!"
 
       - name: Down Container if Running
         run: |
