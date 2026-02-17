@@ -154,17 +154,22 @@ jobs:
           fi
           
 
-      - name: Down Container if Running
+      - name: Deploy and Refresh Application
         run: |
-          echo "🔍 Checking for existing Docker containers..."
-          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "cd $TARGET_DIR && if [ -f docker-compose.yml ]; then docker compose down; else echo '⚠️ No docker-compose.yml found to bring down'; fi"
-
-      - name: Run Docker Compose on Server
-        run: |
-          echo "🚀 Starting application using Docker Compose on remote server..."
-
-          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "cd $TARGET_DIR && docker compose up -d"  
+          echo "🚀 Refreshing and Deploying application..."
+          TARGET_DIR="/root"
           
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no $SSH_USER@${{ secrets.IP_MASTER }} "
+            cd $TARGET_DIR && \
+            # 1. سحب الصور الجديدة أولاً
+            docker compose pull && \
+            # 2. حذف الحاويات والـ Volume الخاص بالفرونت تحديداً
+            # استخدمنا -v مع down لمسح كل الـ Volumes أو امسح الفوليوم المطلوب يدوياً
+            docker compose down && \
+            docker volume rm frontend-files || true && \
+            # 3. التشغيل من جديد
+            docker compose up -d
+          "
 
 
         
